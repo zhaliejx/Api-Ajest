@@ -23,7 +23,13 @@ export const websites_collection: Websites = {
     },
   },
   GogoAnime: {
-    BASE: "https://ww24.gogoanimes.fi",
+    // ww24.gogoanimes.fi 301s every request to www.gogoanime.is (current
+    // canonical clone) — targeting .is directly avoids the redirect hop and
+    // keeps search/category scraping fast. ww24 kept as a clone fallback.
+    BASE: "https://www.gogoanime.is",
+    CLONES: {
+      GogoAnimesFi: ["https://ww24.gogoanimes.fi"],
+    },
   },
   KickAssAnime: {
     BASE: "https://kickass-anime.ro",

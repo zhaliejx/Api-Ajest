@@ -19,7 +19,11 @@ export const getRoot: RequestHandler = async (_req, res) => {
       await Promise.all([
         isSiteReachable("https://aniwatch.to"),
         isSiteReachable("https://aniwatchtv.to"),
-        isSiteReachable("https://gogoanime3.co"),
+        // GogoAnime cluster: canonical clone first, legacy ww24 fallback
+        Promise.all([
+          isSiteReachable("https://www.gogoanime.is"),
+          isSiteReachable("https://ww24.gogoanimes.fi"),
+        ]).then(([is_, fi]) => is_ || fi),
         isSiteReachable(paheBase()),
         isSiteReachable(KAI_BASE),
       ]);
