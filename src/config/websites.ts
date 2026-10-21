@@ -28,4 +28,18 @@ export const websites_collection: Websites = {
   KickAssAnime: {
     BASE: "https://kickass-anime.ro",
   },
+  AnimePahe: {
+    // animepahe rotates TLDs; the entry domain 301s to the current one.
+    // Override with ANIMEPAHE_BASE env when rotation breaks the default.
+    BASE: process.env.ANIMEPAHE_BASE || "https://animepahe.com",
+  },
+  Crunchyroll: {
+    BASE: process.env.CRUNCHYROLL_BASE || "https://www.crunchyroll.com",
+  },
+  AnimeKai: {
+    BASE: process.env.ANIMEKAI_BASE || "https://animekai.to",
+  },
+  MangaDex: {
+    BASE: process.env.MANGADEX_API || "https://api.mangadex.org",
+  },
 };

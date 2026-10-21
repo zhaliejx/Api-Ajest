@@ -1,1348 +1,156 @@
-# ⚡Anime-API⚡
-<p align="center">
-  <img src="https://skillicons.dev/icons?i=ts,express,nodejs,docker" />
-  <br/>
-  <a href="https://api-anime-rouge.vercel.app"><kbd>api-anime-rouge.vercel.app</kbd></a>
-</p>
-<br/><br/>
+# ⚡ Anime-API Fork — Extended Providers ⚡
 
-Check it out at <a href="https://api-anime-rouge.vercel.app"><kbd>api-anime-rouge.vercel.app</kbd></a> or the community-hosted mirror <a href="https://aninescraper.vercel.app"><kbd>aninescraper.vercel.app</kbd></a> by @cloudcompile.  
-Explore the GitHub Pages guide & live playground: <a href="https://cloudcompile.github.io/Anime-API/"><kbd>cloudcompile.github.io/Anime-API</kbd></a>.
+Fork of [falcon71181/Anime-API](https://github.com/falcon71181/Anime-API) (archived upstream)
+that adds **four new providers** and fixes a cross-provider cache collision.
 
-<break>
+**Added in this fork:**
 
->[!IMPORTANT]
->Local Caching is implemented
+| Provider | Routes | What it gives | Notes |
+|---|---|---|---|
+| **AnimePahe** | `/animepahe/*` | search → episodes (paged) → kwik HLS sources with required headers | kwik rotates its challenge scheme; streams need residential-ish egress |
+| **Crunchyroll** | `/crunchyroll/*` | official search → series/seasons/episodes → anonymous-tier stream attempt | **DRM (Widevine) content is reported, never bypassed.** Premium content returns `drmOnly: true` |
+| **AnimeKai** | `/animekai/*` | search → series/episodes → servers → embed iframe URLs | player sources are token-encrypted upstream; embeds only, best-effort |
+| **MangaDex** | `/mangadex/*` | **manga** search → series + chapter list → chapter page image URLs | legit public API — the most stable provider in this fork |
 
-| Routes                                                   | Caching Duration      |
-|---------------------------------------------------------|-----------------------|
-| `/aniwatch/`                                            | 1 day (3600 * 24)     |
-| `/aniwatch/az-list?page=${page}`                        | 1 day (3600 * 24)     |
-| `/aniwatch/search?keyword=$(query)&page=${page}`         | 1 hour (3600)         |
-| `/aniwatch/anime/:id`                                   | 1 month (3600 * 24 * 31) |
-| `/aniwatch/episodes/:id`                                | 1 day (3600 * 24)     |
-| `/aniwatch/servers?id=${id}`                             | 1 day (3600 * 24)    |
-| `/aniwatch/episode-srcs?id=${episodeId}?server=${server}&category=${category}` | 30 minutes (1800)     |
-| `/aniwatch/:category?page=${page}`                      | 1 day (3600 * 24)     |
-| `/gogoanime/home`                                       | 1 day (3600 * 24)     |
-| `/gogoanime/search?keyword=${query}&page=${page}`        | 1 hour (3600)         |
-| `/gogoanime/anime/:id`                                  | 1 day (3600 * 24)     |
-| `/gogoanime/recent-releases?page=${pageNo}`              | 1 day (3600 * 24)    |
-| `/gogoanime/new-seasons?page=${pageNo}`                  | 1 day (3600 * 24)     |
-| `/gogoanime/popular?page=${pageNo}`                      | 1 day (3600 * 24)     |
-| `/gogoanime/completed?page=${pageNo}`                    | 1 day (3600 * 24)     |
-| `/gogoanime/anime-movies?page=${pageNo}`                 | 1 day (3600 * 24)     |
-| `/gogoanime/top-airing?page=${pageNo}`                   | 1 day (3600 * 24)     |
-| `/kickassanime/search?keyword=${query}&page=${page}`     | 1 hour (3600)         |
-| `/kickassanime/anime/:id`                               | 1 day (3600 * 24)     |
-| `/kickassanime/recent?page=${page}`                     | 1 day (3600 * 24)     |
-| `/kickassanime/servers/*`                               | 1 day (3600 * 24)     |
+> **Why MangaDex instead of Bato.to?** bato.to has shut down (the domain now serves a
+> closure page). MangaDex was chosen as the manga source: free public API, no scraping,
+> no anti-bot. Set `MANGADEX_LANGS` (default `en,en-us`) to control chapter languages.
 
+Upstream providers (aniwatch / gogoanime / kickassanime) are unchanged — see
+[UPSTREAM_README.md](./UPSTREAM_README.md) for their full route documentation.
 
-### Deploy this project to Vercel
+---
 
-Click the button below to deploy this project to your Vercel account:
+## New endpoints
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/import/project?template=https://github.com/falcon71181/Anime-API)
-
-
-## ⚡ Web Scraping Status
-
-Anime Websites  |    STATUS
---------------  | -------------
-aniwatch        | <b>DONE</b>
-gogoanime       | <b>WORKING ON IT</b>
-kickassanime    | <b>DONE</b>
-
->[!NOTE]
->More Websites Will be Added in Future
-
-## Index
-
-- [AniWatch](#aniwatch)
-- [GogoAnime](#gogoanime)
-- [KickAssAnime](#kickassanime)
-
-##  <span id="aniwatch">AniWatch</span>
-
-### `GET` AniWatch Home Page
-
-#### Endpoint
-
-```url
-https://api-anime-rouge.vercel.app/aniwatch/
+### AnimePahe
 ```
-
-#### Request sample
-
-```javascript
-const res = await fetch("https://api-anime-rouge.vercel.app/aniwatch/");
-const data = await res.json();
-console.log(data);
+GET /animepahe/search?keyword=frieren
+GET /animepahe/episodes/{slug}                       # full paginated episode list
+GET /animepahe/sources?animeSession={..}&epSession={..}
 ```
+The sources response returns `headers` (Referer/User-Agent) that **must** be sent when
+fetching the HLS manifest — pipe it through your own proxy like this fork's consumers do.
 
-#### Response Schema
-
-```typescript
-{
-  spotlightAnimes: [
-    {
-      id: string,
-      name: string,
-      rank: number,
-      img: string,
-      episodes: {
-        eps: number,
-        sub: number,
-        dub: number,
-      },
-      duration: string,
-      quality: string,
-      category: string,
-      releasedDay: string,
-      descriptions: string,
-    },
-    {...},
-  ],
-  trendingAnimes: [
-    {
-      id: string,
-      name: string,
-      img: string,
-    },
-    {...},
-  ],
-  latestEpisodes: [
-    {
-      id: string,
-      name: string,
-      img: string,
-      episodes: {
-        eps: number,
-        sub: number,
-        dub: number,
-      },
-      duration: string,
-      rated: boolean,
-    },
-    {...},
-  ],
-  top10Animes: {
-    day: [
-      {
-        id: string,
-        name: string,
-        rank: number,
-        img: string,
-        episodes: {
-          eps: number,
-          sub: number,
-          dub: number,
-        },
-      },
-      {...},
-    ],
-    week: [...],
-    month: [...]
-  },
-  featuredAnimes: {
-    topAiringAnimes: [
-        {
-            id: string,
-            name: string,
-            img: string,
-        },
-        {...},
-    ],
-    mostPopularAnimes: [
-        {
-            id: string,
-            name: string,
-            img: string,
-        },
-        {...},
-    ],
-    mostFavoriteAnimes: [
-        {
-            id: string,
-            name: string,
-            img: string,
-        },
-        {...},
-    ],
-    latestCompletedAnimes: [
-        {
-            id: string,
-            name: string,
-            img: string,
-        },
-        {...},
-    ],
-  },
-  topUpcomingAnimes: [
-    {
-      id: string,
-      name: string,
-      img: string,
-      episodes: {
-        eps: number,
-        sub: number,
-        dub: number,
-      },
-      duration: string,
-      rated: boolean,
-    },
-    {...},
-  ],
-  genres: string[]
-}
+### Crunchyroll
 ```
-
-### `GET` AniWatch A to Z List Page
-
-#### Endpoint
-
-```url
-https://api-anime-rouge.vercel.app/aniwatch/az-list?page=${page}
+GET /crunchyroll/search?keyword=frieren
+GET /crunchyroll/series/{seriesId}                   # info + seasons + all episodes
+GET /crunchyroll/sources/{episodeId}?audio=eng
 ```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-
-#### Request sample
-
-```typescript
-const resp = await fetch("https://api-anime-rouge.vercel.app/aniwatch/az-list?page=69");
-const data = await resp.json();
-console.log(data);
+Streams use the anonymous client grant (the same public client id Crunchyroll's own web
+player ships — auto-scraped, or set `CR_CLIENT_ID`). Free/ad-tier episodes may return
+playable HLS. If every version is DRM-protected the response is:
+```json
+{ "sources": [], "drmOnly": true, "error": "all stream versions ... require an authenticated premium token ..." }
 ```
+This fork **does not and will not** circumvent Widevine DRM.
 
-#### Response Schema
-
-```typescript
-[
-        {
-            "id": string,
-            "name": string,
-            "category": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            }
-        },
-        {...},
-],
+### AnimeKai
 ```
-
-### `GET` Anime About Info
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/aniwatch/anime/:id
+GET /animekai/search?keyword=frieren&page=1
+GET /animekai/anime/{slug}
+GET /animekai/servers?id={episodeSession}
+GET /animekai/sources?id={serverId}
 ```
+AnimeKai's titan player encrypts stream URLs with a live key from their JS bundle — that
+scheme is out of scope here, so `sources` returns embed iframe URLs (`isEmbed: true`).
 
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|   `id`    | string |          The unique Anime ID         |    YES    |  -----  |
-
-> [!NOTE]
-> Anime ID should be In <kbd><b>Kebab Case</b></kbd>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/anime/jujutsu-kaisen-2nd-season-18413"
-);
-const data = await res.json();
-console.log(data);
+### MangaDex
 ```
-
-#### Response Schema
-
-``` typescript
-{
-  "info": {
-        "id": string,
-        "anime_id": number,
-        "mal_id": number,
-        "al_id": number,
-        "name": string,
-        "img": string,
-        "rating": string,
-        "episodes": {
-            "eps": number,
-            "sub": number,
-            "dub": number
-        },
-        "category": string,
-        "quality": string,
-        "duration": string,
-        "description": string
-  },
-  "moreInfo": {
-        "Japanese:": string,
-        "Synonyms:": string,
-        "Aired:": string,
-        "Premiered:": string,
-        "Duration:": string,
-        "Status:": string,
-        "MAL Score:": string,
-        "Studios:": string[],
-        "Genres": string[],
-        "Producers": string[]
-    },
-  "seasons": [
-        {
-            "id": string,
-            "name": string,
-            "seasonTitle": string,
-            "img": string,
-            "isCurrent": boolean
-        },
-        {...},
-  },
-  "relatedAnimes": [
-        {
-            "id": string,
-            "name": string,
-            "category": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            }
-        },
-        {...},
-    ],
-  "recommendedAnimes": [
-        {
-            "id": string,
-            "name": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            },
-            "duration": string,
-            "rated": boolean
-        },
-        {...},
-  ],
-  "mostPopularAnimes": [
-        {
-            "id": string,
-            "name": string,
-            "category": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            }
-        },
-        {...},
-  ],
-}
+GET /mangadex/search?keyword=frieren&limit=20&page=1
+GET /mangadex/manga/{mangaId}                        # info + chapter list (paginated)
+GET /mangadex/chapter/{chapterId}                    # page image URLs (at-home server)
 ```
+Chapter pages point at MangaDex's `@home` CDN — hotlink them directly or proxy with the
+`Referer` of your own app.
 
-### `GET` Search Anime
+---
 
-#### Endpoint
+## Deploy
 
-```sh
-https://api-anime-rouge.vercel.app/aniwatch/search?keyword=$(query)&page=$(page)
-```
+### Option A — Vercel (like upstream)
 
-#### Query Parameters
+1. **Fork** this repository on GitHub (button: top-right *Fork*).
+2. Clone your fork, commit your tweaks, push.
+3. On [vercel.com](https://vercel.com) → **Add New Project** → **Import** your fork.
+4. Framework preset: **Other**. Vercel auto-detects `api/index.ts` + `vercel.json` — no build settings needed.
+5. Deploy. Your API is live at `https://<project>.vercel.app`.
 
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `query`  | string |         Search Query for Anime       |    YES    |  -----  |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-> [!NOTE]
-> <div>Search Query should be In <kbd><b>Kebab Case</b></kbd></div>
-> <div>Page No should be a <kbd><b>Number</b></kbd></b></div>
-#### Request sample
+### Option B — Self-host (recommended for the scraping providers)
 
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/search?keyword=one+piece&page=1"
-);
-const data = await res.json();
-console.log(data);
-```
+Self-hosting fixes the #1 problem of Vercel deployments: **datacenter IPs get
+Cloudflare-challenged** by animepahe / crunchyroll / hianime-class sites. A home box,
+a VPS on a cleaner ASN, or a small free-tier VPS usually passes.
 
-#### Response Schema
-
-```typescript
-{
-  "animes": [
-        {
-            "id": string,
-            "name": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            },
-            "duration": string,
-            "rated": boolean
-        },
-        {...},
-  ],
-  "mostPopularAnimes": [
-        {
-            "id": string,
-            "name": string,
-            "category": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            }
-        },
-        {...},
-  ],
-  "currentPage": number,
-  "hasNextPage": boolean,
-  "totalPages": number,
-  "genres": string[]
-}
-```
-
-### `GET` Category Anime
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/aniwatch/:category?page=$(page)
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-| `category`| string |         Search Query for Anime       |    YES    |  -----  |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-> [!NOTE]
-> <div>category should be In <kbd><b>Kebab Case</b></kbd></div>
-> <div>Page No should be a <kbd><b>Number</b></kbd></b></div>
-
-<break>
-
-> [!TIP]
-> Add type to Category - "subbed-anime" | "dubbed-anime" | "tv" | "movie" | "most-popular" | "top-airing" | "ova" | "ona" | "special" | "events";
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/ona?page=1"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "animes": [
-        {
-            "id": string,
-            "name": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            },
-            "duration": string,
-            "rated": boolean
-        },
-        {...},
-  ],
-  "top10Animes": {
-        "day": [
-            {
-                "id": string,
-                "name": string,
-                "rank": number,
-                "img": string,
-                "episodes": {
-                    "eps": number,
-                    "sub": number,
-                    "dub": number
-                }
-            },
-            {..},
-        ],
-        "week": [
-            {
-                "id": string,
-                "name": string,
-                "rank": number,
-                "img": string,
-                "episodes": {
-                    "eps": number,
-                    "sub": number,
-                    "dub": number
-                }
-            },
-            {...},
-        ],
-        "month": [
-            {
-                "id": string,
-                "name": string,
-                "rank": number,
-                "img": string,
-                "episodes": {
-                    "eps": number,
-                    "sub": number,
-                    "dub": number
-                }
-            },
-            {...},
-        ],
-  "category": string,
-  "genres": string[],
-  "currentPage": number,
-  "hasNextPage": boolean,
-  "totalPages": number
-}
-```
-
-### `GET` Anime Episodes
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/aniwatch/episodes/:id
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|    `id`   | string |               Anime ID               |    YES    |  -----  |
-
-<break>
-
-> [!NOTE]
-> <div>Anime ID should be In <kbd><b>Kebab Case</b></kbd></div>
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/episodes/one-piece-100"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "totalEpisodes": number,
-  "episodes": [
-      {
-          "name": string,
-          "episodeNo": number,
-          "episodeId": string,
-          "filler": boolean
-      },
-      {...},
-  ]
-}
-```
-
-### `GET` Anime Episodes Servers
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/aniwatch/servers?id=${id}
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|    `id`   | string |              Episode ID              |    YES    |  -----  |
-
-<break>
-
-> [!NOTE]
-> <div>Episode ID should be In <kbd><b>Kebab Case</b></kbd></div>
-
-important
-
-> [!NOTE]
-> <div><kbd><b>id</b></kbd> is a combination of AnimeId and EpisodeId</div>
-
-eg.
+**Docker:**
 ```bash
-one-piece-100?ep=84802
+docker build -t anime-api-fork .
+docker run -d -p 3001:3001 \
+  -e ANIMEPAHE_BASE=https://animepahe.com \
+  --name anime-api anime-api-fork
 ```
 
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/servers?id=one-piece-100?ep=84802"
-);
-const data = await res.json();
-console.log(data);
+**Bare Node (18+):**
+```bash
+npm install
+npm run build
+PORT=3001 npm start          # serves build/server.js
 ```
 
-#### Response Schema
-
-```typescript
-{
-  "episodeId": string,
-  "episodeNo": number,
-  "sub": [
-    {
-      "serverName": string,
-      "serverId": number
-    },
-    {...},
-  ],
-  "dub": [
-    {
-      "serverName": string,
-      "serverId": number
-    },
-    {...},
-  ],
-}
+**Keep it alive** with systemd/pm2:
+```bash
+pm2 start build/server.js --name anime-api
+pm2 save
 ```
 
-
-### `GET` Anime Episode Streaming Source Links
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/anime/episode-srcs?id={episodeId}&server={server}&category={category}
-```
-
-#### Query Parameters
-
-| Parameter  |  Type  |                  Description                  | Required? |     Default      |
-| :--------: | :----: | :-------------------------------------------: | :-------: | :--------------: |
-|    `id`    | string |                  episode Id                   |    Yes    |        --        |
-|  `server`  | string |                  server name.                 |    No     | `"vidstreaming"` |
-| `category` | string | The category of the episode ('sub' or 'dub'). |    No     |     `"sub"`      |
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/aniwatch/episode-srcs?id=solo-leveling-18718?ep=120094&server=vidstreaming&category=sub"
-);
-const data = await res.json();
-console.log(data);
-```
-> [!CAUTION]
-> decryption key changes frequently ..., it sometime may not work
-
-<break>
-
-#### Response Schema
-
-```typescript
-{
-  headers: {
-    Referer: string,
-    "User-Agent": string,
-    ...
-  },
-  sources: [
-    {
-      url: string,
-      isM3U8: boolean,
-      quality?: string,
-    },
-    {...}
-  ],
-  subtitles: [
-    {
-      lang: "English",
-      url: string,
-    },
-    {...}
-  ],
-  anilistID: number | null,
-  malID: number | null,
-}
-```
-
-<break>
-
-##  <span id="gogoanime">GoGoAnime</span>
-
-### `GET` GoGoAnime Recent Releases
-
-
-### `GET` GoGoAnime Home
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/home
-```
-
-#### Request sample
-
-```javascript
-const res = await fetch("https://api-anime-rouge.vercel.app/gogoanime/home");
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  "genres": string[],
-  "recentReleases": [
-      {
-          "id": string,
-          "name": string,
-          "img": string,
-          "episodeId": string,
-          "episodeNo": number,
-          "subOrDub": "SUB" | "DUB",
-          "episodeUrl": string,
-      },
-      {...},
-  ],
-  "recentlyAddedSeries": [
-      {
-          "id": string,
-          "name": string,
-          "img": string,
-      },
-      {...},
-  ],
-  "onGoingSeries": [
-      {
-          "id": string,
-          "name": string,
-          "img": string,
-      },
-      {...},
-  ],
-]
-```
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/recent-releases?page=${page}
-```
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/recent-releases"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "episodeId": string,
-      "episodeNo": number,
-      "episodeUrl": string,
-      "subOrDub": string   // "SUB" | "DUB"
-  },
-  {...},
-]
-```
-
-<break>
-
-### `GET` GoGoAnime New Seasons
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/new-seasons?page=${page}
-```
-
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/new-seasons"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "releasedYear": string,
-      "animeUrl": string
-  },
-  {...},
-]
-```
-
-<break>
-
-### `GET` GoGoAnime Popular
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/popular?page=${page}
-```
-
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/popular"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "releasedYear": string,
-      "animeUrl": string
-  },
-  {...},
-]
-```
-
-<break>
-
-
-
-### `GET` GoGoAnime Anime Movies
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/anime-movies?page=${page}
-```
-
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/anime-movies"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "releasedYear": string,
-      "animeUrl": string
-  },
-  {...},
-]
-```
-
-<break>
-
-### `GET` GoGoAnime Top Airing
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/top-airing?page=${page}
-```
-
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/top-airing"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "latestEp": string,
-      "animeUrl": string,
-      "genres": string[]
-  },
-  {...},
-]
-```
-
-### `GET` GoGoAnime Completed Animes
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/completed?page=${page}
-```
-
-<break>
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-
-<break>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/completed"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-[
-  {
-      "id": string,
-      "name": string,
-      "img": string,
-      "latestEp": string,
-      "animeUrl": string
-  },
-  {...},
-]
-```
-
-### `GET` Search Anime
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/search?keyword=$(query)&page=$(page)
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `query`  | string |         Search Query for Anime       |    YES    |  -----  |
-|  `page`   | number |        Page No. of Search Page       |    YES    |    1    |
-> [!NOTE]
-> <div>Search Query should be In <kbd><b>Kebab Case</b></kbd></div>
-> <div>Page No should be a <kbd><b>Number</b></kbd></b></div>
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/search?keyword=one+piece&page=1"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "animes": [
-        {
-            "id": string,
-            "name": string,
-            "img": string,
-            "releasedYear": string
-        },
-        {...},
-  ],
-  "mostPopularAnimes": [
-        {
-            "id": string,
-            "name": string,
-            "category": string,
-            "img": string,
-            "episodes": {
-                "eps": number,
-                "sub": number,
-                "dub": number
-            }
-        },
-        {...},
-  ],
-  "currentPage": number,
-  "hasNextPage": boolean,
-  "totalPages": number
-}
-```
-
-
-### `GET` Anime About Info
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/gogoanime/anime/:id
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|   `id`    | string |          The unique Anime ID         |    YES    |  -----  |
-
-> [!NOTE]
-> Anime ID should be In <kbd><b>Kebab Case</b></kbd>
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/gogoanime/anime/one-piece"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-``` typescript
-{
-  "id": string,
-  "anime_id": string,
-  "info": {
-    "name": string,
-    "img": string,
-    "type": string,
-    "genre": string[],
-    "status": string,
-    "aired_in": number,
-    "other_name": string,
-    "episodes": number
-  }
-}
-```
-
-<break>
-
-##  <span id="kickassanime">KickAssAnime</span>
-
-### `GET` KickAssAnime Search
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/kickassanime/search?keyword=${query}&page=${page}
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `keyword`| string |         Search Query for Anime       |    YES    |  -----  |
-|  `page`   | number |        Page No. of Search Page       |    NO     |    1    |
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/kickassanime/search?keyword=naruto&page=1"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "animes": [
-    {
-      "id": string,
-      "title": string,
-      "url": string,
-      "img": string,
-      "releaseDate": string,
-      "subOrDub": "sub" | "dub",
-      "status": string,
-      "otherName": string,
-      "totalEpisodes": number
-    },
-    {...}
-  ],
-  "currentPage": number,
-  "hasNextPage": boolean,
-  "totalPages": number
-}
-```
-
-### `GET` KickAssAnime Anime Info
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/kickassanime/anime/:id
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|   `id`    | string |      The anime slug/id               |    YES    |  -----  |
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/kickassanime/anime/naruto-f3cf"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "id": string,
-  "title": string,
-  "url": string,
-  "genres": string[],
-  "totalEpisodes": number,
-  "img": string,
-  "cover": string,
-  "description": string,
-  "subOrDub": "sub" | "dub",
-  "type": string,
-  "status": string,
-  "otherName": string,
-  "releaseDate": string,
-  "episodes": [
-    {
-      "id": string,
-      "title": string,
-      "number": number,
-      "img": string,
-      "url": string
-    },
-    {...}
-  ]
-}
-```
-
-### `GET` KickAssAnime Recent Releases
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/kickassanime/recent?page=${page}
-```
-
-#### Query Parameters
-
-| Parameter |  Type  |             Description              | Required? | Default |
-| :-------: | :----: | :----------------------------------: | :-------: | :-----: |
-|  `page`   | number |        Page No. of Results           |    NO     |    1    |
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/kickassanime/recent"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "animes": [
-    {
-      "id": string,
-      "title": string,
-      "img": string,
-      "episodeId": string,
-      "episodeNo": number,
-      "subOrDub": "sub" | "dub"
-    },
-    {...}
-  ],
-  "currentPage": number,
-  "hasNextPage": boolean,
-  "totalPages": number
-}
-```
-
-### `GET` KickAssAnime Episode Servers
-
-#### Endpoint
-
-```sh
-https://api-anime-rouge.vercel.app/kickassanime/servers/{animeId}/episode/{episodeId}
-```
-
-#### Query Parameters
-
-| Parameter  |  Type  |             Description              | Required? | Default |
-| :--------: | :----: | :----------------------------------: | :-------: | :-----: |
-| `animeId`  | string |      The anime slug/id               |    YES    |  -----  |
-| `episodeId`| string |      The episode slug/id             |    YES    |  -----  |
-
-#### Request sample
-
-```javascript
-const res = await fetch(
-  "https://api-anime-rouge.vercel.app/kickassanime/servers/naruto-f3cf/episode/ep-1-12cd96"
-);
-const data = await res.json();
-console.log(data);
-```
-
-#### Response Schema
-
-```typescript
-{
-  "episodeId": string,
-  "servers": [
-    {
-      "name": string,
-      "url": string
-    },
-    {...}
-  ]
-}
-```
-
-<break>
-#############################################################################
-
-## <span>🖱️ For Front End</span>
-
-> [!TIP]
-> Kindly use this repo to make Front End
-
-  - [Eltik / Anify](https://github.com/Eltik/Anify)
-
-#############################################################################
-
-## <span>🤝 Thanks ❤️</span>
-
-- [consumet.ts](https://github.com/consumet/consumet.ts)
-- [ghoshRitesh12](https://github.com/ghoshRitesh12)
+> The Dockerfile installs Chromium for Puppeteer (Cloudflare fallback used by
+> kickassanime + animekai). Vercel ignores it (serverless), Node builds skip it
+> with `PUPPETEER_SKIP_DOWNLOAD=1 npm install`.
+
+### Point Ajest at it
+Whatever host you choose, set the resulting URL as the relay assist host in Ajest
+(`RELAY_HOSTS` in `src/lib/ajest/upstream.ts`) — the `/gogoanime/search` contract is
+identical to upstream, so it plugs straight in.
+
+---
+
+## Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3001` | server port (self-host only) |
+| `ANIMEPAHE_BASE` | `https://animepahe.com` | entry domain (301s to the live TLD; override when rotation breaks) |
+| `KWIK_BASE` | `https://kwik.si` | kwik host for source extraction |
+| `CR_CLIENT_ID` | *(auto-scraped)* | Crunchyroll public web client id |
+| `CRUNCHYROLL_BASE` | `https://www.crunchyroll.com` | CR origin |
+| `ANIMEKAI_BASE` | `https://animekai.to` | animekai origin |
+| `MANGADEX_API` | `https://api.mangadex.org` | MangaDex origin |
+| `MANGADEX_COVERS` | `https://uploads.mangadex.org/covers` | cover image base |
+| `MANGADEX_LANGS` | `en,en-us` | chapter languages (comma list) |
+| `MANGADEX_CONTENT_RATING` | `safe,suggestive` | content rating filter |
+
+---
+
+## Honest status matrix (measured 2026-10-22 from a datacenter egress)
+
+| Upstream | Reachable from datacenter | From residential | Provider state |
+|---|---|---|---|
+| MangaDex API | ✅ | ✅ | fully working (verified end-to-end) |
+| AnimePahe | ❌ CF 403 | ✅ usually | code complete, egress-dependent |
+| Crunchyroll | ❌ CF 403 | ✅ usually | code complete, egress-dependent; free-tier streams only, DRM reported honestly |
+| AnimeKai | ❌ (site unreachable) | ✅ usually | code complete, best-effort; embeds only |
+| AniWatch (hianime) | ❌ (upstream site down) | ? | unchanged upstream code |
+| KickAssAnime | ❌ | ✅ | unchanged upstream code |
+| bato.to | **shut down** | — | replaced by MangaDex |
+
+Failures are always **structured JSON with an `error` message** (never hangs, never
+HTML), so consumers can branch cleanly.
+
+## Fixed in this fork (beyond providers)
+
+- **Cache middleware collision**: `req.path` is relative inside sub-routers, so every
+  provider's `/search?keyword=x` shared one cache key — `/crunchyroll/search` could serve
+  `/animepahe/search`'s cached response. Keys now include `req.baseUrl`.
+- **Root status timeouts**: `/` probed five dead sites sequentially with no timeout
+  (15s+ hangs). Now parallel with a 6s cap.

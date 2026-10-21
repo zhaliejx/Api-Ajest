@@ -42,7 +42,10 @@ class AdvancedCache {
       return config.customKeyGenerator(req);
     }
 
-    const components: string[] = [req.method, req.path];
+    // NOTE: req.path is RELATIVE inside sub-routers — every provider's
+    // /search would collide on the same key. Use baseUrl + path for global
+    // uniqueness across providers.
+    const components: string[] = [req.method, (req.baseUrl || "") + req.path];
 
     // Add specified query parameters
     const queryParams: Record<string, any> = {};
