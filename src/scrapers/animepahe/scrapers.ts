@@ -7,6 +7,7 @@ import {
   resolveKwikHls,
   qualityFromKwikUrl,
 } from "../../utils/animepahe/constants";
+import { cfGet } from "../../utils/flaresolverr";
 import type {
   ScrapedPaheEpisodes,
   ScrapedPaheSearch,
@@ -18,12 +19,15 @@ export async function paheSearch(q: string): Promise<ScrapedPaheSearch> {
   const base = paheBase();
   let res;
   try {
-    res = await axios.get(`${base}/api`, {
-      params: { m: "search", q },
-      headers: paheHeaders(),
-      timeout: 15000,
-      maxRedirects: 5,
-    });
+    res = await cfGet<{ data?: Array<{ slug: string; name: string; poster?: string; type?: string }> }>(
+      `${base}/api`,
+      {
+        params: { m: "search", q },
+        headers: paheHeaders(),
+        timeout: 15000,
+        maxRedirects: 5,
+      },
+    );
   } catch (e) {
     const status = (e as { response?: { status?: number } }).response?.status;
     if (status === 403 || status === 503) {
@@ -52,9 +56,9 @@ export async function paheSearch(q: string): Promise<ScrapedPaheSearch> {
 // ── /anime/{slug} page → internal numeric id + session ───────────────────────
 async function animePageMeta(slug: string): Promise<{ id: string; session: string; anilistID: number | null; malID: number | null; name: string }> {
   const base = paheBase();
-  const res = await axios.get(`${base}/anime/${slug}`, {
+  const res = await cfGet<string>(`${base}/anime/${slug}`, {
     headers: { ...paheHeaders(), "X-Requested-With": "" },
-    timeout: 15000,
+    timeout: 20000,
     maxRedirects: 5,
   });
   const html: string = res.data;
@@ -79,12 +83,15 @@ async function animePageMeta(slug: string): Promise<{ id: string; session: strin
 export async function paheEpisodes(slug: string, page = 1): Promise<ScrapedPaheEpisodes> {
   const base = paheBase();
   const meta = await animePageMeta(slug);
-  const res = await axios.get(`${base}/api`, {
-    params: { m: "release", id: meta.id, sort: "episode_asc", page },
-    headers: paheHeaders(),
-    timeout: 15000,
-    maxRedirects: 5,
-  });
+  const res = await cfGet<{ data?: Array<Record<string, string>>; total?: number; per_page?: number; current_page?: number; last_page?: number }>(
+    `${base}/api`,
+    {
+      params: { m: "release", id: meta.id, sort: "episode_asc", page },
+      headers: paheHeaders(),
+      timeout: 15000,
+      maxRedirects: 5,
+    },
+  );
   const d = res.data;
   if (!d || !Array.isArray(d.data)) {
     throw createHttpError(502, "animepahe release API blocked or changed");
@@ -127,9 +134,9 @@ export async function paheSources(
   epSession: string,
 ): Promise<ScrapedPaheSources> {
   const base = paheBase();
-  const playRes = await axios.get(`${base}/play/${animeSession}/${epSession}`, {
+  const playRes = await cfGet<string>(`${base}/play/${animeSession}/${epSession}`, {
     headers: { ...paheHeaders(), "X-Requested-With": "" },
-    timeout: 15000,
+    timeout: 20000,
     maxRedirects: 5,
   });
   const html: string = playRes.data;

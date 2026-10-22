@@ -1,4 +1,4 @@
-export const KAI_BASE = process.env.ANIMEKAI_BASE || "https://animekai.to";
+export const KAI_BASE = process.env.ANIMEKAI_BASE || "https://animekai.cc";
 
 export const KAI_UA =
   process.env.ANIMEKAI_UA ||

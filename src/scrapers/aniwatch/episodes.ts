@@ -2,7 +2,7 @@ import {
   URL_fn,
 } from "../../utils/aniwatch/constants";
 import { headers } from "../../config/headers";
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError } from "../../utils/cfAxios";
 import createHttpError, { HttpError } from "http-errors";
 import { load } from "cheerio";
 import type { CheerioAPI, SelectorType } from "cheerio";

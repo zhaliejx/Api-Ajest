@@ -1,6 +1,7 @@
-import axios from "axios";
+import axios from "../../utils/cfAxios";
 import { load, type CheerioAPI } from "cheerio";
 import { puppeteerGet } from "../../utils/kickassanime/browser";
+import { browserFetch, cfSolverConfigured } from "../../utils/flaresolverr";
 import { KAI_BASE, kaiHeaders } from "../../utils/animekai/constants";
 import type {
   KaiEpisodeServers,
@@ -11,16 +12,36 @@ import type {
 /** AnimeKai sits behind aggressive bot protection; try axios first (fast),
  *  fall back to the shared Puppeteer CF-solver (same pattern as kickassanime). */
 async function kaiGetHtml(url: string): Promise<string> {
+  const cfDeadPage = (h: string) =>
+    h.includes("Just a moment") ||
+    h.includes("cf-challenge") ||
+    h.includes("Web server is down") ||
+    h.includes("Connection timed out") ||
+    h.includes("Attention Required");
+  // animekai serves a ~470-byte JS redirect stub (window.location.replace)
+  // to non-browser clients — only a real browser passes the check.
+  const jsStub = (h: string) =>
+    h.length < 1500 && (h.includes("window.location.replace") || h.includes("<title>Loading...</title>"));
+
   let axiosStatus: number | undefined;
   try {
     const res = await axios.get(url, { headers: kaiHeaders(url), timeout: 15000, maxRedirects: 4 });
     const html: string = res.data;
-    if (html.includes("Just a moment") || html.includes("cf-challenge")) {
-      throw new Error("cloudflare challenge");
+    if (cfDeadPage(html) || jsStub(html)) {
+      throw new Error("cloudflare js-stub challenge");
     }
     return html;
   } catch (e) {
     axiosStatus = (e as { response?: { status?: number } }).response?.status;
+    // FlareSolverr browser tier first (separate service, keeps this API light)
+    if (cfSolverConfigured()) {
+      const solved = await browserFetch<string>(url).catch(() => null);
+      const solvedHtml = solved ? (typeof solved.data === "string" ? solved.data : JSON.stringify(solved.data)) : "";
+      if (solved && solvedHtml.length > 1500 && !cfDeadPage(solvedHtml) && !jsStub(solvedHtml)) {
+        return solvedHtml;
+      }
+    }
+    // in-process Puppeteer as the final fallback (heavy — last resort)
     const viaBrowser = await puppeteerGet(url).catch(() => null);
     if (viaBrowser) return typeof viaBrowser === "string" ? viaBrowser : JSON.stringify(viaBrowser);
     throw new Error(

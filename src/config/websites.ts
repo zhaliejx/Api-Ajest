@@ -43,7 +43,8 @@ export const websites_collection: Websites = {
     BASE: process.env.CRUNCHYROLL_BASE || "https://www.crunchyroll.com",
   },
   AnimeKai: {
-    BASE: process.env.ANIMEKAI_BASE || "https://animekai.to",
+    // animekai.to lost its DNS (Oct 2026) — the live domain is .cc
+    BASE: process.env.ANIMEKAI_BASE || "https://animekai.cc",
   },
   MangaDex: {
     BASE: process.env.MANGADEX_API || "https://api.mangadex.org",

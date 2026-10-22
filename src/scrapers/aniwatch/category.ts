@@ -4,7 +4,7 @@ import {
   URL_fn,
 } from "../../utils/aniwatch/constants";
 import { headers } from "../../config/headers";
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError } from "../../utils/cfAxios";
 import { load } from "cheerio";
 import {
   extract_genre_list,

@@ -1,6 +1,6 @@
 import { URL_fn } from "../../utils/aniwatch/constants";
 import { headers } from "../../config/headers";
-import axios, { AxiosError } from "axios";
+import axios, { AxiosError } from "../../utils/cfAxios";
 import { load, type CheerioAPI } from "cheerio";
 import createHttpError, { type HttpError } from "http-errors";
 import { type AnimeServers, Servers } from "../../types/aniwatch/anime";

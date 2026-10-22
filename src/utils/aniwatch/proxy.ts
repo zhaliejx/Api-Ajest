@@ -1,6 +1,7 @@
 import axios, { AxiosAdapter, AxiosInstance } from "axios";
 
 import { ProxyConfig } from "../../types/aniwatch/anime";
+import { installCfLayer } from "../cfAxios";
 
 export class Proxy {
   /**
@@ -12,7 +13,10 @@ export class Proxy {
     protected proxyConfig?: ProxyConfig,
     protected adapter?: AxiosAdapter,
   ) {
-    this.client = axios.create();
+    // FlareSolverr-assisted Cloudflare clearance layer (no-op without
+    // FLARESOLVERR_URL) — unblocks hianime/rapidcloud/megacloud fetches
+    // from datacenter egress.
+    this.client = installCfLayer(axios.create());
 
     if (proxyConfig) this.setProxy(proxyConfig);
     if (adapter) this.setAxiosAdapter(adapter);

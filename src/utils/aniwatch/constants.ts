@@ -45,16 +45,27 @@ const makeAniWatchObj = (aniwatch_base: string): AniWatchConfig => {
 
 export const DEFAULT_HIANIME_URL = "https://hianime.to";
 
+// Resolve the reachable base once per TTL — the reachability probe costs a
+// 6s timeout per clone on hosts that tarpit plain connections, so re-probing
+// on EVERY scraper call is far too expensive.
+let urlCache: { obj: AniWatchConfig; at: number } | null = null;
+const URL_CACHE_TTL_MS = 10 * 60_000;
+
 // return fn
 const URL_fn = async (): Promise<AniWatchConfig> => {
   try {
+    if (urlCache && Date.now() - urlCache.at < URL_CACHE_TTL_MS) {
+      return urlCache.obj;
+    }
     for (const url of clones_array) {
       if (await isSiteReachable(url as string)) {
         aniwatch_base = url;
         break;
       }
     }
-    return makeAniWatchObj(aniwatch_base as string);
+    const obj = makeAniWatchObj(aniwatch_base as string);
+    urlCache = { obj, at: Date.now() };
+    return obj;
   } catch (error) {
     console.error("Error occurred in both sites:", error);
     throw error; // Rethrow the error to handle it outside
